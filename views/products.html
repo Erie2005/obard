@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Products - Stock Management System</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <button class="mobile-toggle" onclick="toggleSidebar()">
+    <i class="fas fa-bars"></i>
+  </button>
+
+  <div class="app-layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h2><i class="fas fa-store"></i> StockPro</h2>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="/dashboard"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+        <a href="/products" class="active"><i class="fas fa-boxes-stacked"></i> Products</a>
+        <a href="/stock"><i class="fas fa-exchange-alt"></i> Stock Records</a>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-info">
+          <div class="user-avatar">S</div>
+          <div>
+            <div class="user-name">Shopkeeper</div>
+            <div class="user-email"></div>
+          </div>
+        </div>
+        <button class="btn btn-outline btn-sm btn-block" onclick="logout()">
+          <i class="fas fa-sign-out-alt"></i> Logout
+        </button>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <div class="page-header">
+        <div>
+          <h1>Products</h1>
+          <p class="breadcrumb">Manage your product inventory</p>
+        </div>
+        <button class="btn btn-primary" onclick="openAddModal()">
+          <i class="fas fa-plus"></i> Add Product
+        </button>
+      </div>
+
+      <div id="alert-container"></div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3>Product List</h3>
+          <div class="search-box" style="max-width:300px;">
+            <i class="fas fa-search"></i>
+            <input type="text" placeholder="Search products..." id="search-input" oninput="filterProducts()">
+          </div>
+        </div>
+        <div class="card-body" style="padding:0;">
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Name</th>
+                  <th>Category</th>
+                  <th>Unit Price</th>
+                  <th>In Stock</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="products-table">
+              </tbody>
+            </table>
+          </div>
+          <div id="empty-state" class="empty-state" style="display:none;">
+            <i class="fas fa-box-open"></i>
+            <h3>No products yet</h3>
+            <p>Start by adding your first product</p>
+            <button class="btn btn-primary" onclick="openAddModal()">
+              <i class="fas fa-plus"></i> Add Product
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Add/Edit Product Modal -->
+  <div class="modal-overlay" id="product-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modal-title">Add Product</h3>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="product-form" novalidate>
+          <input type="hidden" id="product-id">
+          <div class="form-group">
+            <label for="product-name">Product Name <span class="required">*</span></label>
+            <input type="text" id="product-name" class="form-control" placeholder="e.g. Rice (25kg bag)" required>
+            <p class="field-error" id="product-name-error"></p>
+          </div>
+          <div class="form-group">
+            <label for="product-category">Category</label>
+            <input type="text" id="product-category" class="form-control" placeholder="e.g. Food, Electronics">
+          </div>
+          <div class="form-group">
+            <label for="product-price">Unit Price (USD) <span class="required">*</span></label>
+            <input type="number" id="product-price" class="form-control" placeholder="0.00" step="0.01" min="0" required>
+            <p class="field-error" id="product-price-error"></p>
+          </div>
+          <div class="form-group" id="qty-group">
+            <label for="product-qty">Initial Quantity</label>
+            <input type="number" id="product-qty" class="form-control" placeholder="0" min="0" value="0">
+          </div>
+          <div class="form-group">
+            <label for="product-desc">Description</label>
+            <textarea id="product-desc" class="form-control" placeholder="Brief product description (optional)"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" id="save-btn" onclick="saveProduct()">
+          <i class="fas fa-save"></i> Save Product
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div class="modal-overlay" id="delete-modal">
+    <div class="modal" style="max-width:400px;">
+      <div class="modal-header">
+        <h3>Confirm Delete</h3>
+        <button class="modal-close" onclick="closeDeleteModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="confirm-dialog">
+          <i class="fas fa-trash-alt"></i>
+          <h4>Delete this product?</h4>
+          <p>This action cannot be undone. All stock records for this product will also be deleted.</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeDeleteModal()">Cancel</button>
+        <button class="btn btn-danger" id="confirm-delete-btn" onclick="confirmDelete()">
+          <i class="fas fa-trash"></i> Delete
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let products = [];
+    let deleteProductId = null;
+
+    function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+
+    async function logout() {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.href = '/login';
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function formatCurrency(val) {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
+    }
+
+    function showAlert(message, type) {
+      const container = document.getElementById('alert-container');
+      container.innerHTML = `<div class="alert alert-${type}"><i class="fas fa-${type === 'danger' ? 'exclamation-circle' : type === 'success' ? 'check-circle' : 'info-circle'}"></i> ${message}</div>`;
+      setTimeout(() => container.innerHTML = '', 4000);
+    }
+
+    function showFieldError(id, msg) {
+      const el = document.getElementById(id);
+      if (el) { el.textContent = msg; el.classList.add('show'); }
+    }
+
+    function clearErrors() {
+      document.querySelectorAll('.field-error').forEach(el => { el.textContent = ''; el.classList.remove('show'); });
+      document.querySelectorAll('.form-control').forEach(el => el.classList.remove('error'));
+    }
+
+    function getStockBadge(qty) {
+      if (qty === 0) return '<span class="badge badge-danger">Out of Stock</span>';
+      if (qty <= 5) return '<span class="badge badge-warning">Low Stock</span>';
+      return '<span class="badge badge-success">In Stock</span>';
+    }
+
+    function renderProducts(list) {
+      const tbody = document.getElementById('products-table');
+      const empty = document.getElementById('empty-state');
+
+      if (list.length === 0) {
+        tbody.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+
+      empty.style.display = 'none';
+      tbody.innerHTML = list.map((p, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td><strong>${escapeHtml(p.name)}</strong></td>
+          <td>${escapeHtml(p.category || '-')}</td>
+          <td>${formatCurrency(p.unit_price)}</td>
+          <td><strong>${p.quantity_in_stock}</strong></td>
+          <td>${getStockBadge(p.quantity_in_stock)}</td>
+          <td>
+            <div class="actions-cell">
+              <button class="btn btn-outline btn-sm" onclick="openEditModal(${p.id})" title="Edit">
+                <i class="fas fa-edit"></i>
+              </button>
+              <button class="btn btn-danger btn-sm" onclick="openDeleteModal(${p.id})" title="Delete">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function loadProducts() {
+      try {
+        const res = await fetch('/api/products');
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        products = await res.json();
+        renderProducts(products);
+      } catch (err) {
+        showAlert('Failed to load products', 'danger');
+      }
+    }
+
+    function filterProducts() {
+      const q = document.getElementById('search-input').value.toLowerCase();
+      const filtered = products.filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        (p.category && p.category.toLowerCase().includes(q)) ||
+        (p.description && p.description.toLowerCase().includes(q))
+      );
+      renderProducts(filtered);
+    }
+
+    function openAddModal() {
+      clearErrors();
+      document.getElementById('modal-title').textContent = 'Add Product';
+      document.getElementById('product-id').value = '';
+      document.getElementById('product-name').value = '';
+      document.getElementById('product-category').value = '';
+      document.getElementById('product-price').value = '';
+      document.getElementById('product-qty').value = '0';
+      document.getElementById('product-desc').value = '';
+      document.getElementById('qty-group').style.display = 'block';
+      document.getElementById('product-modal').classList.add('show');
+    }
+
+    async function openEditModal(id) {
+      clearErrors();
+      try {
+        const res = await fetch(`/api/products/${id}`);
+        const p = await res.json();
+        document.getElementById('modal-title').textContent = 'Edit Product';
+        document.getElementById('product-id').value = p.id;
+        document.getElementById('product-name').value = p.name;
+        document.getElementById('product-category').value = p.category || '';
+        document.getElementById('product-price').value = p.unit_price;
+        document.getElementById('product-desc').value = p.description || '';
+        document.getElementById('qty-group').style.display = 'none';
+        document.getElementById('product-modal').classList.add('show');
+      } catch (err) {
+        showAlert('Failed to load product', 'danger');
+      }
+    }
+
+    function closeModal() {
+      document.getElementById('product-modal').classList.remove('show');
+    }
+
+    async function saveProduct() {
+      clearErrors();
+      const id = document.getElementById('product-id').value;
+      const name = document.getElementById('product-name').value.trim();
+      const category = document.getElementById('product-category').value.trim();
+      const unit_price = parseFloat(document.getElementById('product-price').value);
+      const description = document.getElementById('product-desc').value.trim();
+
+      let valid = true;
+      if (!name || name.length < 2) { showFieldError('product-name-error', 'Product name is required (min 2 chars)'); valid = false; }
+      if (isNaN(unit_price) || unit_price < 0) { showFieldError('product-price-error', 'Valid price is required'); valid = false; }
+      if (!valid) return;
+
+      const body = { name, category, unit_price, description };
+      if (!id) body.quantity_in_stock = parseInt(document.getElementById('product-qty').value) || 0;
+
+      const btn = document.getElementById('save-btn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Saving...';
+
+      try {
+        const url = id ? `/api/products/${id}` : '/api/products';
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          closeModal();
+          showAlert(data.message, 'success');
+          loadProducts();
+        } else {
+          showAlert(data.error || data.errors?.[0]?.msg || 'Failed to save', 'danger');
+        }
+      } catch (err) {
+        showAlert('Network error', 'danger');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save"></i> Save Product';
+      }
+    }
+
+    function openDeleteModal(id) {
+      deleteProductId = id;
+      document.getElementById('delete-modal').classList.add('show');
+    }
+
+    function closeDeleteModal() {
+      document.getElementById('delete-modal').classList.remove('show');
+      deleteProductId = null;
+    }
+
+    async function confirmDelete() {
+      if (!deleteProductId) return;
+      const btn = document.getElementById('confirm-delete-btn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Deleting...';
+
+      try {
+        const res = await fetch(`/api/products/${deleteProductId}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (res.ok) {
+          closeDeleteModal();
+          showAlert(data.message, 'success');
+          loadProducts();
+        } else {
+          showAlert(data.error || 'Failed to delete', 'danger');
+        }
+      } catch (err) {
+        showAlert('Network error', 'danger');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-trash"></i> Delete';
+      }
+    }
+
+    loadProducts();
+  </script>
+</body>
+</html>
